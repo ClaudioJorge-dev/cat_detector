@@ -1,6 +1,7 @@
 from utils import get_cat_breed
 from model import predict, load_model
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor 
 import os
 
 class CatDetector:
@@ -26,17 +27,30 @@ class CatDetector:
             return
         
         if Path(path).is_dir():
-            for image_path in Path(path).glob("*.*"):
-                self.detect_cat(image_path)
+            self.detect_all_parallel()
         else:
-            print(f"Processing: {path}...")
-            preds = predict(path)
-            results = get_cat_breed(preds)
-            self.process_results(results, path)
+            self.process_image(self.path)
+            
+    def detect_all_parallel(self):
+        paths = [
+            p for p in Path(self.path).glob("*")
+            if p.suffix.lower() in [".jpg", ".jpeg", ".png"]
+        ]
+        
+        #TODO add max workers?
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(self.process_image, paths)) 
+            
+            
+    def process_image(self, image_path):
+        print(f"Processing: {image_path}...")
+        preds = predict(image_path)
+        results = get_cat_breed(preds)
+        self.process_results(results, image_path)
     
     def process_results(self, results, image_path=None):
         image_name = os.path.basename(image_path) if image_path else "Unknown Image"
         if results:
-            print(f"For \"{image_name}\": {results.label} with probability {results.probability*100:.2f}% \n")
+            print(f"For \"{image_name}\": {results.label} with probability {results.probability*100:.2f}%")
         else:
-            print(f"For \"{image_name}\": No cat detected. \n")
+            print(f"For \"{image_name}\": No cat detected.")
