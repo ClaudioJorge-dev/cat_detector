@@ -2,7 +2,7 @@ import time
 from CatDetector import CatDetector
 
 # Path can be a single image or a directory containing multiple images
-PATH = "images"  
+PATH = "images"  # Example for a single image
 
 init = time.time()
 detector = CatDetector(PATH)

@@ -1,24 +1,19 @@
-from utils import get_cat_breed
-from model import predict, load_model
+from utils import get_cat_breed_from_probs
+from model import load_model, predict_batch
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor 
 import os
 
 class CatDetector:
-    _loaded_model = None
     
     def __init__(self, path):
         self.path = path or "No image path provided."
-        
-    def _load_model(self):
-        if not CatDetector._loaded_model:
-            CatDetector._loaded_model = load_model()
-        return CatDetector._loaded_model
+        self.model = load_model()
         
     def detect_cat(self, path=None):
         path = path or self.path
         
-        if not self._load_model():
+        if not self.model:
             print("Failed to load the model.")
             return
         
@@ -27,26 +22,22 @@ class CatDetector:
             return
         
         if Path(path).is_dir():
-            self.detect_all_parallel()
+            self.detect_all_batch()
         else:
-            self.process_image(self.path)
+            self.detect_all_batch([self.path])
             
-    def detect_all_parallel(self):
-        paths = [
+    def detect_all_batch(self, paths=None):
+        paths = paths or [
             p for p in Path(self.path).glob("*")
-            if p.suffix.lower() in [".jpg", ".jpeg", ".png"]
+            if p.suffix.lower() in [".jpg", ".png", ".jpeg"]
         ]
-        
-        #TODO add max workers?
-        with ThreadPoolExecutor() as executor:
-            results = list(executor.map(self.process_image, paths)) 
+
+        probs = predict_batch(paths)
+
+        for i, path in enumerate(paths):
+            results = get_cat_breed_from_probs(probs[i])
+            self.process_results(results, path)
             
-            
-    def process_image(self, image_path):
-        print(f"Processing: {image_path}...")
-        preds = predict(image_path)
-        results = get_cat_breed(preds)
-        self.process_results(results, image_path)
     
     def process_results(self, results, image_path=None):
         image_name = os.path.basename(image_path) if image_path else "Unknown Image"

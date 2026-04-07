@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import torch
 from torchvision import transforms
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
@@ -13,8 +15,13 @@ transform = transforms.Compose([
 
 model = None
 
+def load_and_transform(image_path):
+    image = Image.open(image_path).convert("RGB")
+    return transform(image)
+
 def load_model():
     global model
+    global device
     if model is None:
         model = mobilenet_v2(weights=MobileNet_V2_Weights.IMAGENET1K_V1)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -22,27 +29,19 @@ def load_model():
     model.eval()
     return model
 
-# predict the class of the image
-def predict(image_path):
-    # load image
-    image = Image.open(image_path)
-    img_transformed = transform(image).unsqueeze(0)
+def predict_batch(image_paths):
+    images = []
     
-    # predict the class
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        images = list(executor.map(load_and_transform, image_paths))
+    
+    images = [img.to(device) for img in images]
+    batch = torch.stack(images)
+    
     with torch.no_grad():
-        outputs = model(img_transformed)
-        probs = torch.nn.functional.softmax(outputs[0], dim=0)
+        outputs = model(batch)
+        probs = torch.nn.functional.softmax(outputs, dim=1)
         
-    top5_prob, top5_catid = torch.topk(probs, 5)
-    results = []
-    for i in range(top5_prob.size(0)):
-        obj = PredictionObj(
-            cat_class=top5_catid[i].item(),
-            probability=top5_prob[i].item(),
-            label=get_label(top5_catid[i].item())
-        )
-        results.append(obj)
-        
-    return results
+    return probs.cpu()
 
 
