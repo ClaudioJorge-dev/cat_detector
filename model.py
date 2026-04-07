@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-
+from tqdm import tqdm
 import torch
 from torchvision import transforms
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
@@ -33,7 +33,7 @@ def predict_batch(image_paths):
     images = []
     
     with ThreadPoolExecutor(max_workers=4) as executor:
-        images = list(executor.map(load_and_transform, image_paths))
+        images = list(tqdm(executor.map(load_and_transform, image_paths), total=len(image_paths)))
     
     images = [img.to(device) for img in images]
     batch = torch.stack(images)
