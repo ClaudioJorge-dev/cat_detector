@@ -14,9 +14,8 @@ is_folder = Path(PATH).is_dir()
 
 # Always get a list of (image, detections)
 results = detector.detect_folder(PATH) if is_folder else [detector.detect(PATH)] 
-idx = 0
 
-for image, detections in results:
+for idx, (image, detections) in enumerate(results):
     for det in detections:
         result = classifier.predict(det["croped_image"])
         
