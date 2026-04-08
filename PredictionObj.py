@@ -1,5 +1,4 @@
 
-
 class PredictionObj:
     def __init__(self, cat_class, probability, label):
         self.cat_class = cat_class
