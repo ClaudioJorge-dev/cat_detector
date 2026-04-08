@@ -1,6 +1,4 @@
-
 import torch
-
 from PredictionObj import PredictionObj
 from imagenet_load import get_label
 
