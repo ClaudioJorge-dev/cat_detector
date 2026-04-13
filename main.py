@@ -4,13 +4,22 @@ from ClassificationModel import ClassificationModel
 from detection.DetectionModel import DetectionModel
 import os
 
-# Path can be a single image or a directory containing multiple images
-PATH = "images"  
+# Welcoming message
+print("Welcome to the Cat Breed Detection and Classification System!")
 
+# Models initialization
 detector = DetectionModel()
 classifier = ClassificationModel()
 
+# Path can be a single image or a directory containing multiple images
+PATH = input("Enter the path to the image or directory: ") or "images/default.jpg"
 is_folder = Path(PATH).is_dir()
+
+generate_website = input("Do you want to generate a website to display results? (y/n): ").lower() == "y"
+OUTPUT_PATH = input("Enter the output path for results (default: 'outputs'): ") or "outputs"
+
+if not Path(OUTPUT_PATH).exists():
+    Path(OUTPUT_PATH).mkdir(parents=True, exist_ok=True)
 
 # Always get a list of (image, detections)
 results = detector.detect_folder(PATH) if is_folder else [detector.detect(PATH)] 
@@ -28,6 +37,6 @@ for idx, (image, detections) in enumerate(results):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,250,0), 2)
             
     # Save output for each image separately
-    output_name = f"output_{Path(PATH).name}" if not is_folder else f"output_{idx}.jpg"
+    output_name = f"{OUTPUT_PATH}/{Path(PATH).name}" if not is_folder else f"{OUTPUT_PATH}/output_{idx}.jpg"
     cv2.imwrite(output_name, image)
     idx += 1
