@@ -35,7 +35,8 @@ for idx, (image, detections) in enumerate(results):
             cv2.rectangle(image, (x1,y1), (x2,y2), (0,255,0), 2)
             cv2.putText(image, result.label, (x1, y1-10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,250,0), 2)
-            
+            cv2.putText(image, f"{result.probability*100:.2f}%", (x1, y2+15),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,250,0), 2)
     # Save output for each image separately
     output_name = f"{OUTPUT_PATH}/{Path(PATH).name}" if not is_folder else f"{OUTPUT_PATH}/output_{idx}.jpg"
     cv2.imwrite(output_name, image)
