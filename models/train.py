@@ -1,8 +1,30 @@
 from torchvision.datasets import OxfordIIITPet # Pet dataset for training
-from torchvision import transforms
-from torch.utils.data import DataLoader
+from torchvision import transforms, datasets
+from torch.utils.data import DataLoader, random_split
 from model import create_model, load_model
 import torch
+
+def validate(model, val_loader, criterion, device):
+    """
+    Validates the model in training with the validation set.
+    REturns the average loss over the validation set.
+    """
+    model.eval() # set the model to evaluation mode
+    total_loss = 0.0
+    
+    with torch.no_grad(): # no need to compute gradients during validation
+        for images, labels in val_loader:
+            images, labels = images.to(device), labels.to(device) # move to the same device as the model
+            outputs = model(images) # forward pass (Calculates the predicted probabilities and the resulting loss (how wrong the model is).)
+            loss = criterion(outputs, labels) # compute the loss
+            total_loss += loss.item() # accumulate the loss
+            
+    model.train()
+    return total_loss / len(val_loader) # return the average loss over the validation set
+
+"""
+Training loop
+"""
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 learning_rate = 5e-5
@@ -22,11 +44,27 @@ dataset = OxfordIIITPet(root='data', # path to store the dataset
                         transform=transforms 
                         )
 
-
 # filter only cats
 cat_data = [(img, labels) for img, labels in dataset if labels < 12] # Dog breeds start at index 12, so we take only those with labels less than 12
 
-loader = DataLoader(cat_data, batch_size=batch_size, shuffle=True)
+"""
+Split the dataset into training and validation sets
+Training data: Used to train the model (80% of the data)
+Validation data: Used to evaluate the model during training and tune hyperparameters (20% of the data)
+
+This is ensures that the model generalizes well to unseen data and to prevent overfitting (where the model performs well on training data but poorly on new, unseen data).
+"""
+
+train_data_size = int(0.8 * len(cat_data)) # 80% for training
+val_data_size = len(cat_data) - train_data_size # remaining 20% for validation
+
+# shuffles the dataset and splits it into training and validation sets based on the specified sizes.
+# this allows the model to learn from a diverse set of examples and not only the first 80% breeds
+# random_split dont ensure that the same breeds are in both training and validation sets, but it does ensure that the data is randomly distributed between the two sets, which helps in generalization.
+train_data, val_data = random_split(cat_data, [train_data_size, val_data_size]) 
+
+train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True) # shuffle the training data for better learning
+val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False) # no need to shuffle validation
 
 model = create_model()
 model = model.to(device)
@@ -46,7 +84,10 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min')
 
 # epoch definition: https://www.geeksforgeeks.org/machine-learning/epoch-in-machine-learning/
 for epoch in range(num_epochs): # loop over the dataset mult times
-    for images, labels in loader:
+    
+    total_train_loss = 0.0
+    
+    for images, labels in train_loader:
         optimizer.zero_grad() # zero the parameter gradients
         #Ensures everything is on the same device
         images, labels = images.to(device), labels.to(device) # move to the same device as the model
@@ -54,9 +95,14 @@ for epoch in range(num_epochs): # loop over the dataset mult times
         loss = criterion(outputs, labels) # compute the loss
         loss.backward() # backward pass/backpropagation (Computes the gradient of the loss with respect to the model parameters.)
         optimizer.step() # update the model parameters based on the computed gradients (using the Adam optimization algorithm).
+
+        total_train_loss += loss.item() # accumulate the training loss
     
-    # scheduler.step(loss) # update the learning rate based on the scheduler ❌ training loss
-    print(f"Epoch {epoch +1}/{num_epochs}, Loss: {loss.item():.4f}") # print the loss for the current epoch
+    train_loss = total_train_loss / len(train_loader) # average training loss over the epoch
+    val_loss = validate(model, val_loader, criterion, device) # compute validation loss
+    scheduler.step(val_loss) # update the learning rate based on the validation loss (if it has stopped improving)
+    
+    print(f"Epoch {epoch +1}/{num_epochs} | Train: {train_loss:.4f} | Val: {val_loss:.4f}")
     
 # save model
 torch.save(model.state_dict(), f"trained_models/model_lr{learning_rate}_bs{batch_size}_ep{num_epochs}.pth") # pth = PyTorch model file extension
