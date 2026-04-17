@@ -27,9 +27,13 @@ Training loop
 """
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-learning_rate = 5e-5
+initial_learning_rate = 5e-5
 batch_size = 32 
-num_epochs = 20
+num_epochs = 30
+scheduler_patience = 3 # number of epoch to wait before saving the best model
+best_val_loss = float('inf') 
+patience_counter = 0 # tracks how long the validation loss has not improved (used for early stopping)
+early_stop_patience = 5 # number of epoch to wait before stopping the training if the validation loss does not improve
 
 transforms = transforms.Compose([
     transforms.Resize((224,224)),
@@ -77,10 +81,10 @@ model.train() # set the model to training mode
 criterion = torch.nn.CrossEntropyLoss() 
 
 # https://docs.pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) # The learning rate controls how big each “step” is when the model learns from its mistakes.
+optimizer = torch.optim.Adam(model.parameters(), lr=initial_learning_rate) # The learning rate controls how big each “step” is when the model learns from its mistakes.
 
 # ReduceLROnPlateau reduces the learning rate when a metric has stopped improving.
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min') 
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min', patience=scheduler_patience, factor=0.5) 
 
 # epoch definition: https://www.geeksforgeeks.org/machine-learning/epoch-in-machine-learning/
 for epoch in range(num_epochs): # loop over the dataset mult times
@@ -102,7 +106,18 @@ for epoch in range(num_epochs): # loop over the dataset mult times
     val_loss = validate(model, val_loader, criterion, device) # compute validation loss
     scheduler.step(val_loss) # update the learning rate based on the validation loss (if it has stopped improving)
     
-    print(f"Epoch {epoch +1}/{num_epochs} | Train: {train_loss:.4f} | Val: {val_loss:.4f}")
+    print(f"Epoch {epoch +1}/{num_epochs} | Train: {train_loss:.4f} | Val: {val_loss:.4f} | LR: {optimizer.param_groups[0]['lr']}") 
     
-# save model
-torch.save(model.state_dict(), f"trained_models/model_lr{learning_rate}_bs{batch_size}_ep{num_epochs}.pth") # pth = PyTorch model file extension
+    # save the best model
+    if val_loss<best_val_loss:
+        best_val_loss = val_loss
+        torch.save(model.state_dict(), 'trained_models/cat_pred_model.pth')
+        print(f"Best model saved at epoch: {epoch + 1} with validation loss: {best_val_loss:.4f}")
+        patience_counter = 0 
+    else:
+        patience_counter += 1
+        
+    # early stopping
+    if patience_counter >= early_stop_patience:
+        print(f"Early stopping triggered at epoch: {epoch + 1}. No improvement in validation loss for {early_stop_patience} epochs.")
+        break
