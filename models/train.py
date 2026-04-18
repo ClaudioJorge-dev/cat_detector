@@ -29,7 +29,7 @@ Training loop
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 initial_learning_rate = 5e-5
 batch_size = 32 
-num_epochs = 30
+num_epochs = 40
 scheduler_patience = 3 # number of epoch to wait before saving the best model
 best_val_loss = float('inf') 
 patience_counter = 0 # tracks how long the validation loss has not improved (used for early stopping)
@@ -37,7 +37,20 @@ early_stop_patience = 5 # number of epoch to wait before stopping the training i
 
 transforms = transforms.Compose([
     transforms.Resize((224,224)),
+    
+    # Data augmentation
+    transforms.RandomHorizontalFlip(), # randomly flip the image horizontally (default = 50% chance)
+    transforms.RandomRotation(degrees=10), # randomly rotate the image by up to 10 degrees
+    transforms.ColorJitter(
+        brightness = 0.2, contrast = 0.2, saturation = 0.25,
+        hue = 0.05
+    ), # randomly change the brightness, contrast, saturation, and hue of the image (with specified ranges) > https://docs.pytorch.org/vision/main/generated/torchvision.transforms.ColorJitter.html
+    
+    # Tranform to tensor before normalization
     transforms.ToTensor(),
+    
+    # Normalization (scales pixel values to a consistent range, most commonly [0,1] or [-1,1]. This improves model convergence, helps gradients behave, and often results in better accuracy.)
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet normalization values
 ])
 
 # Load the dataset. Followed Doc: https://docs.pytorch.org/vision/main/generated/torchvision.datasets.OxfordIIITPet.html
@@ -70,7 +83,7 @@ train_data, val_data = random_split(cat_data, [train_data_size, val_data_size])
 train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True) # shuffle the training data for better learning
 val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False) # no need to shuffle validation
 
-model = create_model()
+model = create_model(training=True) # create the model with training=True to freeze early layers
 model = model.to(device)
 model.train() # set the model to training mode
 
@@ -83,8 +96,8 @@ criterion = torch.nn.CrossEntropyLoss()
 # https://docs.pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
 optimizer = torch.optim.Adam(model.parameters(), lr=initial_learning_rate) # The learning rate controls how big each “step” is when the model learns from its mistakes.
 
-# ReduceLROnPlateau reduces the learning rate when a metric has stopped improving.
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min', patience=scheduler_patience, factor=0.5) 
+# ReduceLROnPlateau reduces the learning rate when a metric has gotten worse for patience epochs.
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min', patience=scheduler_patience, factor=0.3) 
 
 # epoch definition: https://www.geeksforgeeks.org/machine-learning/epoch-in-machine-learning/
 for epoch in range(num_epochs): # loop over the dataset mult times
@@ -121,3 +134,4 @@ for epoch in range(num_epochs): # loop over the dataset mult times
     if patience_counter >= early_stop_patience:
         print(f"Early stopping triggered at epoch: {epoch + 1}. No improvement in validation loss for {early_stop_patience} epochs.")
         break
+    
