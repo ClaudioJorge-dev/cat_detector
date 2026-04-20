@@ -29,7 +29,7 @@ Training loop
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 initial_learning_rate = 5e-5
 batch_size = 32 
-num_epochs = 40
+num_epochs = 50
 scheduler_patience = 3 # number of epoch to wait before saving the best model
 best_val_loss = float('inf') 
 patience_counter = 0 # tracks how long the validation loss has not improved (used for early stopping)
@@ -97,7 +97,7 @@ criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=initial_learning_rate) # The learning rate controls how big each “step” is when the model learns from its mistakes.
 
 # ReduceLROnPlateau reduces the learning rate when a metric has gotten worse for patience epochs.
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min', patience=scheduler_patience, factor=0.3) 
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode = 'min', patience=scheduler_patience, factor=0.1) 
 
 # epoch definition: https://www.geeksforgeeks.org/machine-learning/epoch-in-machine-learning/
 for epoch in range(num_epochs): # loop over the dataset mult times
