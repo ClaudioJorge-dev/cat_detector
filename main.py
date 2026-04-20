@@ -1,7 +1,7 @@
 import cv2
 from pathlib import Path
-from ClassificationModel import ClassificationModel
-from detection.DetectionModel import DetectionModel
+from models.ClassificationModel import ClassificationModel
+from models.DetectionModel import DetectionModel
 import os
 
 # Welcoming message
